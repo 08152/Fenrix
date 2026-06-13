@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>THIRD PERSON FIXED</title>
+<title>TPS FIXED</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
@@ -29,14 +29,14 @@ z-index:10;
 
 <div id="ui">
 WASD Move<br>
-1 = Soldier<br>
-2 = Tank
+FPS/TPS Controller
 </div>
 
 <div id="coords"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
 
 <script>
 
@@ -56,7 +56,7 @@ const sun = new THREE.DirectionalLight(0xffffff,2);
 sun.position.set(10,20,10);
 scene.add(sun);
 
-// ================= FLAT WORLD =================
+// ================= WORLD =================
 const ground = new THREE.Mesh(
 new THREE.PlaneGeometry(5000,5000),
 new THREE.MeshStandardMaterial({color:0x2f9e44})
@@ -65,67 +65,42 @@ ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
 // ================= LOADERS =================
-const loader = new THREE.GLTFLoader();
+const gltfLoader = new THREE.GLTFLoader();
+const fbxLoader = new THREE.FBXLoader();
 
-// ================= PLAYER (SKETCHFAB GLB) =================
+// ================= PLAYER =================
 let player;
 let mixer;
 let runAction;
 
-// 👉 SKETCHFAB FILE
-loader.load("germany_trooper_1.glb",(gltf)=>{
+// ================= LOAD GLB PLAYER =================
+gltfLoader.load("germany_trooper_1.glb",(gltf)=>{
 
 player = gltf.scene;
 scene.add(player);
 
 player.position.set(0,0,0);
 
-// Animation Mixer (GLB ONLY!)
+// animation mixer for GLB skeleton
 mixer = new THREE.AnimationMixer(player);
 
-// automatisch erste Animation suchen
-if(gltf.animations.length > 0){
+});
 
-runAction = mixer.clipAction(gltf.animations[0]);
+// ================= LOAD FBX ANIMATION =================
+fbxLoader.load("Fast Run.fbx",(anim)=>{
+
+if(!mixer) return;
+
+runAction = mixer.clipAction(anim.animations[0]);
 runAction.loop = THREE.LoopRepeat;
 
-}
-
 });
-
-// ================= WEAPON =================
-let weapon;
-
-loader.load("germany_weapon_1.glb",(gltf)=>{
-
-weapon = gltf.scene;
-camera.add(weapon);
-scene.add(camera);
-
-weapon.position.set(0.5,-0.7,-1.5);
-
-});
-
-// ================= TANK =================
-let tank;
-let inTank = false;
-let tankTimer = 0;
 
 // ================= INPUT =================
 const keys = {};
 
-window.addEventListener("keydown",(e)=>{
-
-keys[e.key.toLowerCase()] = true;
-
-if(e.key === "1") exitTank();
-if(e.key === "2") enterTank();
-
-});
-
-window.addEventListener("keyup",(e)=>{
-keys[e.key.toLowerCase()] = false;
-});
+window.addEventListener("keydown",(e)=>keys[e.key.toLowerCase()]=true);
+window.addEventListener("keyup",(e)=>keys[e.key.toLowerCase()]=false);
 
 // ================= MOVEMENT =================
 let speed = 0;
@@ -154,82 +129,32 @@ dir.normalize();
 
 player.position.addScaledVector(dir,speed);
 
-// CAMERA THIRD PERSON
-camera.position.lerp(
-new THREE.Vector3(
+// ================= CAMERA (180° BEHIND PLAYER) =================
+const offset = new THREE.Vector3(0, 3, 8); // hinten + oben
+
+// 🔥 180° rotation effect = opposite direction
+offset.applyAxisAngle(new THREE.Vector3(0,1,0), Math.PI);
+
+const camPos = player.position.clone().add(offset);
+
+camera.position.lerp(camPos, 0.08);
+
+camera.lookAt(
 player.position.x,
-player.position.y + 2,
-player.position.z + 6
-),0.1
+player.position.y + 1.5,
+player.position.z
 );
 
-camera.lookAt(player.position.x,player.position.y+1,player.position.z);
-
-// RUN ANIMATION
+// ================= ANIMATION =================
 if(runAction){
 
 if(moving){
-runAction.play();
+if(!runAction.isRunning()) runAction.play();
 }else{
 runAction.stop();
 }
 
 }
-
-}
-
-// ================= TANK =================
-function enterTank(){
-
-if(inTank) return;
-
-inTank = true;
-tankTimer = 3600;
-
-loader.load("tank.glb",(gltf)=>{
-
-if(tank) scene.remove(tank);
-
-tank = gltf.scene;
-scene.add(tank);
-
-tank.position.copy(player.position);
-tank.rotation.y = Math.PI;
-
-});
-
-}
-
-function exitTank(){
-
-inTank = false;
-
-if(tank){
-scene.remove(tank);
-tank = null;
-}
-
-}
-
-// ================= TANK CAMERA =================
-function updateTank(){
-
-if(!tank) return;
-
-tank.position.copy(player.position);
-
-camera.position.lerp(
-new THREE.Vector3(
-tank.position.x,
-tank.position.y + 6,
-tank.position.z + 12
-),0.08
-);
-
-camera.lookAt(tank.position);
-
-tankTimer--;
-if(tankTimer<=0) exitTank();
 
 }
 
@@ -245,12 +170,6 @@ const delta = clock.getDelta();
 if(mixer) mixer.update(delta);
 
 move();
-
-if(inTank) updateTank();
-
-if(weapon){
-weapon.visible = !inTank;
-}
 
 document.getElementById("coords").innerHTML =
 `X:${player?.position.x.toFixed(2)||0}<br>
