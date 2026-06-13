@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>TPS FIXED</title>
+<title>FBX TPS GAME</title>
 
 <style>
 body { margin:0; overflow:hidden; background:#87cfff; }
@@ -29,13 +29,12 @@ z-index:10;
 
 <div id="ui">
 WASD Move<br>
-FPS/TPS Controller
+Soldier + Fast Run Animation
 </div>
 
 <div id="coords"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.js"></script>
 
 <script>
@@ -65,32 +64,32 @@ ground.rotation.x = -Math.PI/2;
 scene.add(ground);
 
 // ================= LOADERS =================
-const gltfLoader = new THREE.GLTFLoader();
-const fbxLoader = new THREE.FBXLoader();
+const loader = new THREE.FBXLoader();
 
 // ================= PLAYER =================
 let player;
 let mixer;
 let runAction;
 
-// ================= LOAD GLB PLAYER =================
-gltfLoader.load("germany_trooper_1.glb",(gltf)=>{
+// ================= LOAD SOLDIER =================
+loader.load("soldier.fbx",(obj)=>{
 
-player = gltf.scene;
+player = obj;
 scene.add(player);
 
 player.position.set(0,0,0);
 
-// animation mixer for GLB skeleton
+// Animation system
 mixer = new THREE.AnimationMixer(player);
 
 });
 
-// ================= LOAD FBX ANIMATION =================
-fbxLoader.load("Fast Run.fbx",(anim)=>{
+// ================= LOAD RUN =================
+loader.load("Fast Run.fbx",(anim)=>{
 
 if(!mixer) return;
 
+// Mixamo FBX → first animation clip
 runAction = mixer.clipAction(anim.animations[0]);
 runAction.loop = THREE.LoopRepeat;
 
@@ -109,7 +108,8 @@ function move(){
 
 if(!player) return;
 
-const moving = keys["w"]||keys["a"]||keys["s"]||keys["d"];
+const moving =
+keys["w"]||keys["a"]||keys["s"]||keys["d"];
 
 if(moving){
 speed += 0.02;
@@ -129,15 +129,12 @@ dir.normalize();
 
 player.position.addScaledVector(dir,speed);
 
-// ================= CAMERA (180° BEHIND PLAYER) =================
-const offset = new THREE.Vector3(0, 3, 8); // hinten + oben
-
-// 🔥 180° rotation effect = opposite direction
-offset.applyAxisAngle(new THREE.Vector3(0,1,0), Math.PI);
+// ================= THIRD PERSON CAMERA =================
+const offset = new THREE.Vector3(0, 2.5, 6); // hinten + oben
 
 const camPos = player.position.clone().add(offset);
 
-camera.position.lerp(camPos, 0.08);
+camera.position.lerp(camPos,0.1);
 
 camera.lookAt(
 player.position.x,
